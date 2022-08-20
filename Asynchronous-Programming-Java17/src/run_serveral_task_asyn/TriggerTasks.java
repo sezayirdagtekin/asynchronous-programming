@@ -1,4 +1,4 @@
-package trigger_task_from_outcome;
+package run_serveral_task_asyn;
 
 import record.Quotation;
 
@@ -22,50 +22,30 @@ public class TriggerTasks {
     public static void run() throws InterruptedException {
 
 
-        List<Supplier<Quotation>> quotationTask = createSuppliers();
+        List<Supplier<Quotation>> quotationTasks = buildQuotation();
 
-        Instant begin = Instant.now();
+        List<CompletableFuture<Quotation>> quotationsCFS = new ArrayList<>();
+        for (Supplier<Quotation> task : quotationTasks) {
 
-        List<CompletableFuture<Quotation>> futures = new ArrayList<>();
-        for (Supplier<Quotation> task : quotationTask) {
             CompletableFuture<Quotation> future = CompletableFuture.supplyAsync(task);
-            futures.add(future);
-        }
-        //ArrayList is not thread safe but ConcurrentLinkedDeque thread safe
-        Collection<Quotation> quotations = new ConcurrentLinkedDeque<>();
-        List<CompletableFuture<Void>> completableFutureList = new ArrayList<>();
-        for (CompletableFuture<Quotation> future : futures) {
-
-            //This is blocking code removed
-            // Quotation quotation = future.join();
-            CompletableFuture<Void> completableFuture = future.thenAccept(quotation -> quotations.add(quotation));
-            completableFutureList.add(completableFuture);
-
+            quotationsCFS.add(future);
         }
 
-        //This is not best way to complete before main thread is die
-        //Thread.sleep(2000);
+        CompletableFuture<Void> allOf = CompletableFuture.allOf(quotationsCFS.toArray(CompletableFuture[]::new));
 
-        //This is better
-        for (CompletableFuture cf : completableFutureList) {
-            cf.join();
-        }
 
-        System.out.println("quotations:" + quotations);
+        Quotation bestQuotation = allOf.thenApply(v -> quotationsCFS.stream()
+                .map(CompletableFuture::join)
+                .min(Comparator.comparing(Quotation::amount))
+                .orElseThrow()).join();
 
-        Quotation bestQuotation = quotations.stream().min(Comparator.comparing(Quotation::amount)).orElseThrow();
 
-        Instant end = Instant.now();
-
-        Duration duration = Duration.between(begin, end);
-
-        System.out.println("Best quotation [ASYNC ] = " + bestQuotation +
-                " (" + duration.toMillis() + "ms)");
+        System.out.println("Best quotation [ASYNC ] = " + bestQuotation);
 
 
     }
 
-    private static List<Supplier<Quotation>> createSuppliers() {
+    private static List<Supplier<Quotation>> buildQuotation() {
         Supplier<Quotation> callableA = () -> {
             try {
                 Thread.sleep(random.nextInt(80, 120));
