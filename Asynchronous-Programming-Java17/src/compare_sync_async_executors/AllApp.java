@@ -1,4 +1,4 @@
-package compare;
+package compare_sync_async_executors;
 
 import java.util.concurrent.ExecutionException;
 
