@@ -17,7 +17,13 @@ import java.util.function.Supplier;
 
 
 class HandleExceptionComposingTasks {
-
+    private static final Random random = new Random();
+    private static int quotationThreadIndex = 0;
+    private  final static ThreadFactory quotationThreadFactory = r -> new Thread(r, "Quotation-" + quotationThreadIndex++);
+    private static int weatherThreadIndex = 0;
+    private final static ThreadFactory weatherThreadFactory = r -> new Thread(r, "Weather-" + weatherThreadIndex++);
+    private static int minThreadIndex = 0;
+    private final static ThreadFactory minThreadFactory = r -> new Thread(r, "Min-" + minThreadIndex++);
 
     public static void main(String[] args) throws InterruptedException {
         run();
@@ -33,28 +39,14 @@ class HandleExceptionComposingTasks {
         //TravelPage[quotation=Quotation[server=Server C, amount=44], weather=Weather[server=Unknown server, weather=Unknown]]
     }
 
-    private static int quotationThreadIndex = 0;
-    private static ThreadFactory quotationThreadFactory =
-            r -> new Thread(r, "Quotation-" + quotationThreadIndex++);
-
-    private static int weatherThreadIndex = 0;
-    private static ThreadFactory weatherThreadFactory =
-            r -> new Thread(r, "Weather-" + weatherThreadIndex++);
-
-    private static int minThreadIndex = 0;
-    private static ThreadFactory minThreadFactory =
-            r -> new Thread(r, "Min-" + minThreadIndex++);
 
     public static void run() throws InterruptedException {
 
-        ExecutorService quotationExecutor =
-                Executors.newFixedThreadPool(4, quotationThreadFactory);
-        ExecutorService weatherExecutor =
-                Executors.newFixedThreadPool(4, weatherThreadFactory);
-        ExecutorService minExecutor =
-                Executors.newFixedThreadPool(1, minThreadFactory);
+        ExecutorService quotationExecutor = Executors.newFixedThreadPool(4, quotationThreadFactory);
+        ExecutorService weatherExecutor = Executors.newFixedThreadPool(4, weatherThreadFactory);
+        ExecutorService minExecutor = Executors.newFixedThreadPool(1, minThreadFactory);
 
-        Random random = new Random();
+
 
         List<Supplier<Weather>> weatherTasks = buildWeatherTasks(random);
         List<Supplier<Quotation>> quotationTasks = buildQuotationTasks(random);
@@ -63,10 +55,10 @@ class HandleExceptionComposingTasks {
         for (Supplier<Weather> weatherTask : weatherTasks) {
             CompletableFuture<Weather> weatherCF =
                     CompletableFuture.supplyAsync(weatherTask, weatherExecutor)
-                                    .exceptionally(e->{
-                                        System.out.println("Something is wrong!! "+e);
-                                        return  new Weather("Unknown server","Unknown");
-                                    });
+                            .exceptionally(e -> {
+                                System.out.println("Something is wrong!! " + e);
+                                return new Weather("Unknown server", "Unknown");
+                            });
             weatherCFs.add(weatherCF);
         }
 
@@ -81,15 +73,14 @@ class HandleExceptionComposingTasks {
             CompletableFuture<Quotation> quotationCF =
                     CompletableFuture
                             .supplyAsync(quotationTask, quotationExecutor)
-                                    .handle( (quotation,exception) ->{
-                                  if(exception==null) {
-                                      return quotation;
-                                     }
-                                  else {
-                                      System.out.println("Something is wrong in  qutation server"+exception.getMessage());
-                                      return new Quotation("Unknown server",1_000);
-                                    }
-                                    });
+                            .handle((quotation, exception) -> {
+                                if (exception == null) {
+                                    return quotation;
+                                } else {
+                                    System.out.println("Something is wrong in  qutation server" + exception.getMessage());
+                                    return new Quotation("Unknown server", 1_000);
+                                }
+                            });
             quotationCFs.add(quotationCF);
         }
 
@@ -142,7 +133,7 @@ class HandleExceptionComposingTasks {
                     //System.out.println("WB running in " + Thread.currentThread());
                     //return new Weather("Server B", "Mostly Sunny");
 
-                    throw new  RuntimeException(new IOException("Weather server B is unavailable!"));
+                    throw new RuntimeException(new IOException("Weather server B is unavailable!"));
                 };
         Supplier<Weather> fetchWeatherC =
                 () -> {
@@ -169,9 +160,9 @@ class HandleExceptionComposingTasks {
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }
-                   // System.out.println("QA running in " + Thread.currentThread());
+                    // System.out.println("QA running in " + Thread.currentThread());
                     //return new Quotation("Server A", random.nextInt(40, 60));
-                    throw new  RuntimeException(new IOException("Quotation server A is unavailable!"));
+                    throw new RuntimeException(new IOException("Quotation server A is unavailable!"));
                 };
         Supplier<Quotation> fetchQuotationB =
                 () -> {
